@@ -55,7 +55,7 @@ class Condition:
 class RiffusionTrack:
     def __init__(self, audio: str, audio_variation: str, conditions: List[dict], duration_s: float, id: str,
                  lyrics_timestamped: dict, simple_waveform: List[float], status: str, title: str, result_file_path=None,
-                 lyrics=None):
+                 lyrics=None, image=None, *args, **kwargs):
         self.audio = audio
         self.result_file_path = result_file_path
         self.audio_variation = audio_variation
@@ -67,6 +67,7 @@ class RiffusionTrack:
         self.status = status
         self.title = title
         self.lyrics = lyrics
+        self.image = image
 
     @classmethod
     def from_json(cls, json_data: dict):
