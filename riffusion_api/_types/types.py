@@ -93,7 +93,7 @@ class RiffusionLoginInfo:
         else:
             json_data = data
 
-        print("json_data", json_data)
+        # print("json_data", json_data)
 
         self.access_token = json_data['access_token']
         self.expires_at = json_data['expires_at']
@@ -223,8 +223,10 @@ class RiffusionAccount:
 
             self.timeout_till = time.time() + 60*60 # 1 hour timeout
             raise RiffusionRefreshError(response.text)
+        # print(f"Old refresh: {self.login_info.refresh_token}")
         self.login_info = RiffusionLoginInfo(response.json())
         self.save_to_json()
+        # print(f"New refresh: {self.login_info.refresh_token}")
 
         return self.login_info
 

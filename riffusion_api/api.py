@@ -122,7 +122,7 @@ class RiffusionAPI:
     # @profile
     def _wait_for_uplaod(self, account, file_id, attempts=30):
         for i in range(attempts):
-            url = f"https://wb.riffusion.com/v2/upload-audio/{file_id}"
+            url = f"https://wb.riffusion.com/transcribe-audio/{file_id}"
 
             payload = ""
             headers = {
@@ -144,12 +144,15 @@ class RiffusionAPI:
 
             json_data = response.json()
 
-            status = json_data['status']
+            status = json_data.get('status')
+
+            if not status:
+                raise RiffusionGenerationError(f"No status: {json_data}")
 
             if status in [None, "pending"]:
                 time.sleep(5)
             elif status == "complete":
-                return json_data['transcribed_lyrics']
+                return json_data['lyrics']
             else:
                 raise RiffusionGenerationError(f"Cant upload file: {response.status_code}, {response.text}")
 
@@ -188,8 +191,9 @@ class RiffusionAPI:
         }
 
         # Формирование данных для отправки
+        upload_file_id = str(uuid.uuid4())
         payload = {
-            'upload_file_id': str(uuid.uuid4()),
+            'upload_file_id': upload_file_id,
         }
 
         # Загружаем файл (предполагается, что это бинарный файл, например, аудиофайл)
@@ -207,9 +211,12 @@ class RiffusionAPI:
         # Выводим ответ
         # print(response.json(), response.status_code)
 
-        file_id = response.json()['job_id']
+        transcription_job_id = response.json().get('transcription_job_id')
 
-        result = file_id, self._wait_for_uplaod(account=account, file_id=file_id)
+        if not transcription_job_id:
+            raise RiffusionGenerationError(f"No transcription_job_id: {response.json()}")
+
+        result = upload_file_id, self._wait_for_uplaod(account=account, file_id=transcription_job_id)
 
         if not hash_audio_storage.get(account.login_info.user_id):
             hash_audio_storage[account.login_info.user_id] = {}
@@ -233,7 +240,7 @@ class RiffusionAPI:
     # @profile
     def _wait_for_generate(self, account, job_id, attempts=60) -> RiffusionTrack:
         for i in range(attempts):
-            url = f"https://wb.riffusion.com/v2/generate/{job_id}"
+            url = f"https://wb.riffusion.com/generate/status/{job_id}"
 
             payload = ""
             headers = {
@@ -256,7 +263,7 @@ class RiffusionAPI:
             # print(response.json())
             json_data = response.json()
             status = json_data['status']
-            # print(f"status: {status}")
+            # print(f"status: {status}, {json_data}"[:40])
 
             if status in ['queued', 'generating_audio']:
                 time.sleep(5)
@@ -282,8 +289,9 @@ class RiffusionAPI:
                  normalized_sound_prompt_strength=1.0,
                  inpainting_strength=0.5,
                  verbose=False,
+                 normalized_weirdness=0.5,
                  attempts=10
-                 ) -> RiffusionTrack:
+                 ) -> List[RiffusionTrack]:
         """
         Генерирует музыкальный трек на основе заданных параметров.
 
@@ -329,7 +337,7 @@ class RiffusionAPI:
             try:
                 account = self._get_valid_account()
 
-                url = "https://wb.riffusion.com/v2/generate"
+                url = "https://wb.riffusion.com/generate/compose"
 
                 if not music_style:
                     music_style = "."
@@ -339,14 +347,16 @@ class RiffusionAPI:
 
                 if input_file:
                     audio_upload_id, lyrics_transcribed = self._upload_file(file_path=input_file, account=account)
+                    # print("audio_upload_id", audio_upload_id)
                     if not prompt:
                         prompt = lyrics_transcribed
 
+                    audio = AudioSegment.from_file(input_file)
+                    audio_len = len(audio) / 1000
+                    del audio
                     if transform == RiffusionTransformType.extend:
                         if not crop_end_at:
-                            audio = AudioSegment.from_file(input_file)
-                            crop_end_at = len(audio) / 1000
-                            del audio
+                            crop_end_at = audio_len
 
                         crop_end_at = min(crop_end_at, 3 * 60)  # max 3:00 extend
 
@@ -354,6 +364,8 @@ class RiffusionAPI:
                             "audio_upload_id": audio_upload_id,
                             "transform": transform,
                             "crop_end_at": crop_end_at,
+                            "duration": audio_len,
+                            "normalized_weirdness": normalized_weirdness,
                             "normalized_lyrics_strength": normalized_lyrics_strength,
                             "normalized_sound_prompt_strength": normalized_sound_prompt_strength
                         }
@@ -361,14 +373,15 @@ class RiffusionAPI:
                         morph_data = {
                             "audio_upload_id": audio_upload_id,
                             "transform": transform,
-                            "inpainting_strength": inpainting_strength,
+                            "duration": 0,
+                            "normalized_cover_strength": inpainting_strength,
+                            "normalized_weirdness": normalized_weirdness,
                             "normalized_lyrics_strength": normalized_lyrics_strength,
                             "normalized_sound_prompt_strength": normalized_sound_prompt_strength
                         }
 
                 payload = {
-                    "riff_id": str(uuid.uuid4()),
-                    "seed": seed,
+                    "riff_id": "",
                     "conditions": [
                         {
                             "lyrics": prompt,
@@ -385,7 +398,7 @@ class RiffusionAPI:
                     ],
                     "group_id": str(uuid.uuid4()),
                     "advanced_mode": True,
-                    "weirdness": weirdness,
+                    "morph": morph_data,
                     "model_public_name": RiffusionModels.fuzz_08,
                     "stream": False,
                     "audio_format": "aac",
@@ -408,6 +421,8 @@ class RiffusionAPI:
                     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 YaBrowser/24.12.0.0 Safari/537.36"
                 }
 
+                # print("payload", payload)
+
                 response = self._session.request("POST", url, json=payload, headers=headers, proxies=self.proxies)
 
                 if response.status_code in [429]:
@@ -420,15 +435,27 @@ class RiffusionAPI:
                 # print(response.text)
 
                 json_data = response.json()
-                track = self._wait_for_generate(account=account, job_id=json_data['job_id'])
-                file_ext = os.path.splitext(output_file)[1][1:]
-                track.save_audio(file_path=output_file, output_format=file_ext)
-                track.lyrics = prompt
+                riffusion_tracks = []
+                jobs = json_data.get('jobs')
+                job_id = json_data.get('job_id')
+                if not jobs:
+                    if not job_id:
+                        raise RiffusionGenerationError(f"No jobs: {json_data}")
+                    else:
+                        jobs = [{"id":job_id}]
+                # print("jobs", jobs)
+                for num_job, job in enumerate(jobs):
+                    track = self._wait_for_generate(account=account, job_id=job['id'])
+                    file_ext = os.path.splitext(output_file)[1][1:]
+                    track.save_audio(file_path=output_file.replace(".mp3",f"{num_job}_.mp3"), output_format=file_ext)
+                    track.lyrics = prompt
+                    riffusion_tracks.append(track)
 
-                return track
+                return riffusion_tracks
             except Exception as e:
                 logger.logging(f"Error {i+1}/{attempts} while generation: {traceback.format_exc()}")
-        raise RiffusionGenerationError(f"После {attempts} попыток не удалось создать песню.")
+                if attempts == i+1:
+                    raise RiffusionGenerationError(f"После {attempts} попыток не удалось создать песню: {e}")
 
 
 if __name__ == '__main__':
