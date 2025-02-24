@@ -425,7 +425,7 @@ class RiffusionAPI:
 
                 response = self._session.request("POST", url, json=payload, headers=headers, proxies=self.proxies)
 
-                if response.status_code in [429]:
+                if response.status_code in [429] or response.json().get("code", "") == "over_request_rate_limit":
                     logger.logging("Too many requests. Change account")
                     account.timeout_till = time.time() + 60*20 # 20 minutes timeout
                     continue
