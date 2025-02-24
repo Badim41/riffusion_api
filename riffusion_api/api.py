@@ -456,8 +456,9 @@ class RiffusionAPI:
                 logger.logging(f"Error {i+1}/{attempts} while generation: {traceback.format_exc()}")
                 if attempts == i+1:
                     raise RiffusionGenerationError(f"После {attempts} попыток не удалось создать песню: {e}")
-            # finally:
-            #     os.remove(output_file)
+            finally:
+                if os.path.exists(output_file):
+                    os.remove(output_file)
 
 
 if __name__ == '__main__':
