@@ -452,6 +452,8 @@ class RiffusionAPI:
                     riffusion_tracks.append(track)
 
                 return riffusion_tracks
+            except RiffusionModerationError as e:
+                raise e
             except Exception as e:
                 logger.logging(f"Error {i+1}/{attempts} while generation: {traceback.format_exc()}")
                 if attempts == i+1:
