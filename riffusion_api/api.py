@@ -4,6 +4,7 @@ import mimetypes
 import os
 import random
 import shutil
+import threading
 import time
 import traceback
 import uuid
@@ -19,7 +20,7 @@ from ._types import RiffusionAccount, RiffusionTrack, RiffusionTransformType, Ri
 from .logs import Logs, Color
 from .s_utils import random_string
 
-logger = Logs(warnings=True)
+logger = Logs(warnings=True, name="riffusion_api")
 
 json_account_save = "riffusion_accounts.json"
 
@@ -27,7 +28,7 @@ hash_audio_storage ={}
 
 
 class RiffusionAPI:
-    def __init__(self, sb_api_auth_tokens_0: [list, str] = None, proxies=None):  # , refresh_accounts=True
+    def __init__(self, sb_api_auth_tokens_0: [list, str] = None, proxies=None, refresh_accounts=True):  #
         self.proxies = proxies
         self.api_email = None
         self._session = Session()
@@ -43,12 +44,20 @@ class RiffusionAPI:
 
         self.sb_api_auth_tokens_0 = sb_api_auth_tokens_0
         self.new_accounts: List[RiffusionAccount] = self.create_account_database(self.sb_api_auth_tokens_0, proxies=self.proxies)
+        if refresh_accounts:
+            threading.Thread(target=self.refresh_accounts).start()
 
-    #     if refresh_accounts:
-    #         threading.Thread(target=self.refresh_accounts).start()
-    #
-    # def refresh_accounts(self, time_refresh=60 * 60 * 12, start_sleep=1600):  # refresh
-    #     logger.logging("not need refresh accounts")
+    def refresh_accounts(self, time_refresh=60*60, start_sleep=10*60):
+        # logger.logging(f"Sleep till refresh accounts: {start_sleep}")
+        time.sleep(start_sleep)
+        logger.logging("Start refresh accounts")
+        while True:
+            try:
+                self.new_accounts: List[RiffusionAccount] = self.create_account_database([], self.proxies, refresh=True)
+                time.sleep(time_refresh)
+            except:
+                logger.logging(f"Error in refresh accounts! :", str(traceback.format_exc()), color=Color.RED)
+                time.sleep(60)
 
     # @profile
     def create_account_database(self, sb_api_auth_tokens_0: List[str], proxies=None, refresh=False) -> List[RiffusionAccount]:
@@ -67,7 +76,7 @@ class RiffusionAPI:
             try:
                 expires_at = old_account_data['expires_at']
 
-                if expires_at - 60 * 60 * 24 * 3 > int(time.time()) and not refresh:  # more than 3 days to expire
+                if expires_at - 60 * 10 > int(time.time()) and not refresh:  # more than 10 minutes to expire
                     exist_account = RiffusionAccount.from_dict(old_account_data, proxies=proxies)
                     new_instances.append(old_account_data)
                     new_accounts.append(exist_account)

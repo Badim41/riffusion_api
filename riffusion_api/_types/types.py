@@ -4,9 +4,12 @@ import json
 import time
 from typing import List, Optional
 
+from ..logs import Logs, Color
+
 import requests
 from pydub import AudioSegment
 
+logger = Logs(warnings=True, name="riffusion_typyes")
 
 json_account_save = "riffusion_accounts.json"
 
@@ -223,10 +226,10 @@ class RiffusionAccount:
 
             self.timeout_till = time.time() + 60*60 # 1 hour timeout
             raise RiffusionRefreshError(response.text)
-        # print(f"Old refresh: {self.login_info.refresh_token}")
+        logger.logging(f"Old refresh: {self.login_info.refresh_token}")
         self.login_info = RiffusionLoginInfo(response.json())
         self.save_to_json()
-        # print(f"New refresh: {self.login_info.refresh_token}")
+        logger.logging(f"New refresh: {self.login_info.refresh_token}")
 
         return self.login_info
 
