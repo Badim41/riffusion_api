@@ -338,12 +338,13 @@ class RiffusionAPI:
         if os.path.exists(output_file):
             logger.logging(f"File {os.path.abspath(output_file)} exists. It will be removed")
 
-        if input_file:
-            shutil.copy(input_file, output_file)  # чтобы не изменить исходный файл
-            input_file = output_file
 
         for i in range(attempts):
             try:
+                if input_file:
+                    shutil.copy(input_file, output_file)  # чтобы не изменить исходный файл
+                    input_file = output_file
+
                 account = self._get_valid_account()
 
                 url = "https://wb.riffusion.com/generate/compose"
