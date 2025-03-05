@@ -341,10 +341,6 @@ class RiffusionAPI:
 
         for i in range(attempts):
             try:
-                if input_file:
-                    shutil.copy(input_file, output_file)  # чтобы не изменить исходный файл
-                    input_file = output_file
-
                 account = self._get_valid_account()
 
                 url = "https://wb.riffusion.com/generate/compose"
@@ -461,6 +457,9 @@ class RiffusionAPI:
                     track.lyrics = prompt
                     riffusion_tracks.append(track)
 
+                if os.path.exists(output_file):
+                    os.remove(output_file)
+
                 return riffusion_tracks
             except RiffusionModerationError as e:
                 raise e
@@ -468,9 +467,6 @@ class RiffusionAPI:
                 logger.logging(f"Error {i+1}/{attempts} while generation: {traceback.format_exc()}")
                 if attempts == i+1:
                     raise RiffusionGenerationError(f"После {attempts} попыток не удалось создать песню: {e}")
-            finally:
-                if os.path.exists(output_file):
-                    os.remove(output_file)
 
 
 if __name__ == '__main__':
