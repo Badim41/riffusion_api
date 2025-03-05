@@ -299,7 +299,7 @@ class RiffusionAPI:
                  inpainting_strength=0.5,
                  verbose=False,
                  normalized_weirdness=0.5,
-                 attempts=10
+                 attempts=50
                  ) -> List[RiffusionTrack]:
         """
         Генерирует музыкальный трек на основе заданных параметров.
