@@ -56,24 +56,25 @@ class Condition:
 
 
 class RiffusionTrack:
-    def __init__(self, audio: str, audio_variation: str, conditions: List[dict], duration_s: float, id: str,
-                 lyrics_timestamped: dict, simple_waveform: List[float], status: str, title: str, result_file_path=None,
-                 lyrics=None, image=None, *args, **kwargs):
-        self.audio = audio
-        self.result_file_path = result_file_path
-        self.audio_variation = audio_variation
-        self.conditions = [Condition(**condition) for condition in conditions]
-        self.duration_s = duration_s
+    def __init__(self, id: str, status: str, generation:dict, *args, **kwargs):
+        self.result_file_path = None
+
         self.id = id
-        self.lyrics_timestamped = lyrics_timestamped
-        self.simple_waveform = simple_waveform
         self.status = status
-        self.title = title
-        self.lyrics = lyrics
-        self.image = image
+        self.generation = generation
+        self.audio = generation['audio_b64']
+        self.audio_variation = generation['audio_variation']
+        self.conditions = [Condition(**condition) for condition in generation['conditions']]
+        self.duration_s = generation['duration_s']
+        self.lyrics_timestamped = generation['lyrics_timestamped']
+        self.simple_waveform = generation['simple_waveform']
+        self.title = generation['title']
+        self.lyrics = generation['lyrics']
+        self.image = generation['image_b64']
 
     @classmethod
     def from_json(cls, json_data: dict):
+        # print("json_data", str(json_data)[:1000])
         return cls(**json_data)
 
     def save_audio(self, file_path: str, output_format="aac"):
